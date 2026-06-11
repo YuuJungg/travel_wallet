@@ -1398,10 +1398,23 @@ try{
 }catch(e){}
 go(startView);
 
-// 서비스워커 등록 (오프라인 작동). https 또는 localhost에서만 동작.
+// 서비스워커 등록 (오프라인 작동 + 자동 최신화). https 또는 localhost에서만 동작.
 if("serviceWorker" in navigator){
   window.addEventListener("load", ()=>{
-    navigator.serviceWorker.register("sw.js").catch(err=>console.warn("SW 등록 실패", err));
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      // 앱을 열 때마다 새 버전이 있는지 확인
+      reg.update();
+      reg.addEventListener("updatefound", ()=>{
+        const sw = reg.installing;
+        if(!sw) return;
+        sw.addEventListener("statechange", ()=>{
+          // 새 버전 설치 완료 + 기존 SW가 제어 중이면 → 한 번 새로고침
+          if(sw.state==="installed" && navigator.serviceWorker.controller){
+            window.location.reload();
+          }
+        });
+      });
+    }).catch(err=>console.warn("SW 등록 실패", err));
   });
 }
 </script>
