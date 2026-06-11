@@ -1,0 +1,17 @@
+{
+  "name": "얼마지 — 여행 지출 트래커",
+  "short_name": "얼마지",
+  "description": "이거 얼마지? 나 얼마 남았지? 완전 오프라인 현금 지출 트래커.",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf6ef",
+  "theme_color": "#d6452c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

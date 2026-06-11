@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>얼마지 — 여행 지출 트래커</title>
+
+<!-- PWA: 홈화면 설치 + 오프라인 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#d6452c">
+<!-- iOS 홈화면 앱 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="얼마지">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+
+<!-- 폰트: 오프라인 fallback 필수. CDN 못 불러와도 시스템 기본 고딕으로 무난하게. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#d6452c;
+    --red-dark:#b5371f;
+    --cream:#faf6ef;
+    --paper:#fffdf8;
+    --ink:#33302b;
+    --muted:#8a8278;
+    --line:#e7ddcd;
+    --teal:#3c7a89;
+    --shadow:0 2px 8px rgba(80,60,40,.08);
+    --safe-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Gowun Dodum','Zen Maru Gothic',"Apple SD Gothic Neo","Malgun Gothic",
+      "Noto Sans KR",system-ui,-apple-system,sans-serif;
+    background:var(--cream);
+    color:var(--ink);
+    font-size:16px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Zen Maru Gothic','Gowun Dodum',sans-serif;margin:0;font-weight:700;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input,select{font-family:inherit;font-size:16px;}
+
+  #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+
+  /* 상단 헤더 */
+  header{
+    padding:18px 20px 12px;
+    text-align:center;
+    border-bottom:1px dashed var(--line);
+    background:var(--paper);
+    position:relative;
+  }
+  header .brand{font-size:22px;color:var(--red);letter-spacing:1px;}
+  header .tagline{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  /* 본문 */
+  main{flex:1;padding:16px 16px 96px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+  /* 카드 — 영수증 느낌 */
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px;
+    box-shadow:var(--shadow);
+    margin-bottom:14px;
+  }
+  .card.receipt{
+    background:
+      repeating-linear-gradient(var(--paper),var(--paper) 31px,#f3ecdf 32px);
+    background-attachment:local;
+  }
+
+  /* 잔액 메인 */
+  .balance-card{text-align:center;padding:26px 18px;}
+  .balance-label{font-size:13px;color:var(--muted);letter-spacing:2px;}
+  .balance-main{
+    font-family:'Zen Maru Gothic',sans-serif;
+    font-size:46px;font-weight:700;line-height:1.1;margin:6px 0 2px;
+    color:var(--ink);
+  }
+  .balance-main.negative{color:var(--red);}
+  .balance-sub{font-size:16px;color:var(--muted);}
+  .balance-warn{color:var(--red);font-size:13px;margin-top:8px;font-weight:500;}
+
+  .summary-row{
+    display:flex;justify-content:space-between;gap:8px;margin-top:18px;
+    padding-top:16px;border-top:1px dashed var(--line);
+  }
+  .summary-item{flex:1;text-align:center;}
+  .summary-item .v{font-size:17px;font-weight:700;font-family:'Zen Maru Gothic',sans-serif;}
+  .summary-item .k{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* 빠른 환산기 */
+  .converter{display:flex;align-items:center;gap:10px;}
+  .converter input{
+    flex:1;width:100%;padding:12px 14px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;text-align:right;font-size:20px;font-weight:700;
+    color:var(--ink);outline:none;
+  }
+  .converter input:focus{border-color:var(--red);}
+  .converter .eq{font-size:20px;color:var(--muted);}
+  .converter .out{flex:1;text-align:right;font-size:20px;font-weight:700;color:var(--teal);}
+
+  .section-title{font-size:14px;color:var(--muted);margin:4px 4px 10px;letter-spacing:.5px;}
+
+  /* 폼 */
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
+  .field input[type=text],.field input[type=number],.field input[type=date],.field select{
+    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+    background:#fff;color:var(--ink);outline:none;
+  }
+  .field input:focus,.field select:focus{border-color:var(--red);}
+  .amount-wrap{position:relative;display:flex;align-items:center;gap:10px;}
+  .amount-wrap input{flex:1;text-align:right;font-size:20px;font-weight:700;}
+  .amount-wrap .live{font-size:14px;color:var(--teal);white-space:nowrap;min-width:84px;text-align:right;}
+
+  /* 칩 (태그/사람) */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{
+    padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);
+    background:#fff;font-size:14px;color:var(--ink);display:inline-flex;align-items:center;gap:6px;
+    transition:all .12s;
+  }
+  .chip .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+  .chip.selected{border-color:var(--red);background:#fdeee9;color:var(--red-dark);font-weight:700;}
+  .chip.add{border-style:dashed;color:var(--muted);}
+
+  .btn{
+    display:block;width:100%;padding:15px;border-radius:12px;background:var(--red);
+    color:#fff;font-size:17px;font-weight:700;font-family:'Zen Maru Gothic',sans-serif;
+    box-shadow:var(--shadow);transition:transform .08s,background .12s;
+  }
+  .btn:active{transform:scale(.985);background:var(--red-dark);}
+  .btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;}
+  .btn.ghost{background:transparent;color:var(--red);box-shadow:none;}
+  .btn.small{padding:9px 14px;font-size:14px;width:auto;display:inline-block;}
+
+  /* 내역 필터 탭 */
+  .filter-tabs{
+    display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;margin:0 -2px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  }
+  .filter-tabs::-webkit-scrollbar{display:none;}
+  .ftab{
+    flex:none;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);
+    background:#fff;font-size:14px;color:var(--ink);display:inline-flex;align-items:center;gap:6px;
+    transition:all .12s;white-space:nowrap;
+  }
+  .ftab .cnt{
+    font-size:11px;background:#f0ece3;color:var(--muted);border-radius:999px;padding:1px 7px;min-width:18px;text-align:center;
+  }
+  .ftab.active{border-color:var(--red);background:#fdeee9;color:var(--red-dark);font-weight:700;}
+  .ftab.active .cnt{background:var(--red);color:#fff;}
+
+  /* 내역 합계 카드 */
+  .list-total{text-align:center;padding:18px;}
+  .list-total .lt-label{font-size:12px;color:var(--muted);letter-spacing:1px;}
+  .list-total .lt-main{font-family:'Zen Maru Gothic',sans-serif;font-size:32px;font-weight:700;line-height:1.15;margin:4px 0 1px;}
+  .list-total .lt-sub{font-size:14px;color:var(--muted);}
+
+  /* 리스트(지출/충전) */
+  .day-group{margin-bottom:18px;}
+  .day-head{font-size:13px;color:var(--muted);margin:0 4px 8px;display:flex;justify-content:space-between;}
+  .day-head .total{font-weight:700;color:var(--ink);}
+  .entry{
+    display:flex;align-items:center;gap:12px;padding:12px 6px;border-bottom:1px dashed var(--line);
+  }
+  .entry:last-child{border-bottom:none;}
+  .entry .tag-dot{width:10px;height:10px;border-radius:50%;flex:none;}
+  .entry .info{flex:1;min-width:0;}
+  .entry .info .item{font-size:16px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entry .info .meta{font-size:12px;color:var(--muted);margin-top:1px;}
+  .entry .amt{text-align:right;flex:none;}
+  .entry .amt .f{font-size:16px;font-weight:700;font-family:'Zen Maru Gothic',sans-serif;}
+  .entry .amt .h{font-size:12px;color:var(--muted);}
+  .entry .who-badge{
+    font-size:11px;padding:2px 7px;border-radius:999px;background:#f0ece3;color:var(--muted);flex:none;
+  }
+  .entry .who-badge.shared{background:#e3f0f2;color:var(--teal);}
+
+  .empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px;}
+  .empty .big{font-size:40px;margin-bottom:8px;opacity:.5;}
+
+  /* 정산 */
+  .settle-person{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:#fff;
+  }
+  .settle-person .name{font-size:16px;font-weight:700;}
+  .settle-person .breakdown{font-size:12px;color:var(--muted);margin-top:3px;}
+  .settle-person .owe{text-align:right;}
+  .settle-person .owe .f{font-size:22px;font-weight:700;font-family:'Zen Maru Gothic',sans-serif;color:var(--red);}
+  .settle-person .owe .h{font-size:13px;color:var(--muted);}
+
+  /* 설정 행 */
+  .setting-row{
+    display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px dashed var(--line);
+  }
+  .setting-row:last-child{border-bottom:none;}
+  .setting-row .grow{flex:1;min-width:0;}
+  .setting-row .name{font-size:15px;}
+  .setting-row .sub{font-size:12px;color:var(--muted);}
+  .icon-btn{padding:6px 10px;border-radius:8px;font-size:13px;color:var(--muted);border:1px solid var(--line);background:#fff;}
+  .icon-btn.danger{color:var(--red);}
+  .owner-badge{font-size:11px;background:var(--red);color:#fff;padding:2px 8px;border-radius:999px;}
+
+  /* 하단 네비 */
+  nav{
+    position:fixed;bottom:0;left:0;right:0;z-index:50;
+    background:var(--paper);border-top:1px solid var(--line);
+    display:flex;max-width:520px;margin:0 auto;
+    padding-bottom:var(--safe-bottom);
+    box-shadow:0 -2px 10px rgba(80,60,40,.05);
+  }
+  nav button{
+    flex:1;padding:8px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    font-size:11px;color:var(--muted);
+  }
+  nav button .ico{font-size:20px;line-height:1;}
+  nav button.active{color:var(--red);font-weight:700;}
+
+  /* 토글 스위치 */
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);}
+  .switch{position:relative;width:42px;height:24px;background:var(--line);border-radius:999px;transition:.15s;flex:none;}
+  .switch.on{background:var(--red);}
+  .switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s;}
+  .switch.on::after{left:20px;}
+
+  /* 모달 */
+  .overlay{
+    position:fixed;inset:0;background:rgba(40,30,20,.45);z-index:100;
+    display:none;align-items:flex-end;justify-content:center;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--paper);width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:22px 20px calc(22px + var(--safe-bottom));box-shadow:0 -4px 20px rgba(0,0,0,.2);
+    animation:slideup .2s ease;
+  }
+  @keyframes slideup{from{transform:translateY(40px);opacity:.6;}to{transform:none;opacity:1;}}
+  .modal h3{font-size:18px;margin-bottom:14px;}
+  .modal .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .modal .modal-actions .btn{flex:1;}
+
+  .rate-note{font-size:13px;color:var(--teal);background:#e9f3f4;border-radius:10px;padding:10px 12px;margin-bottom:14px;}
+  .danger-note{font-size:13px;color:var(--red);}
+  .toast{
+    position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;
+    z-index:200;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;
+  }
+  .toast.show{opacity:.95;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">얼마지</div>
+    <div class="tagline">이거 얼마지? 나 얼마 남았지?</div>
+  </header>
+
+  <main>
+    <!-- 홈 -->
+    <section class="view active" id="view-home"></section>
+    <!-- 지출 추가 -->
+    <section class="view" id="view-add"></section>
+    <!-- 지출 내역 -->
+    <section class="view" id="view-list"></section>
+    <!-- 충전 -->
+    <section class="view" id="view-charge"></section>
+    <!-- 정산 -->
+    <section class="view" id="view-settle"></section>
+    <!-- 설정 -->
+    <section class="view" id="view-settings"></section>
+  </main>
+
+  <nav>
+    <button data-nav="home" class="active"><span class="ico">🏠</span>홈</button>
+    <button data-nav="add"><span class="ico">➕</span>지출</button>
+    <button data-nav="list"><span class="ico">🧾</span>내역</button>
+    <button data-nav="charge"><span class="ico">💴</span>충전</button>
+    <button data-nav="settle"><span class="ico">🤝</span>정산</button>
+    <button data-nav="settings"><span class="ico">⚙️</span>설정</button>
+  </nav>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   얼마지 — 여행 지출 트래커
+   단일 HTML / vanilla JS / localStorage / 완전 오프라인
+   통화·사람 하드코딩 금지: 모두 데이터(state)에서 읽어 쓴다.
+   ========================================================================= */
+
+const STORAGE_KEY = "eolmaji.v1";
+const SHARED = "SHARED";
+
+/* ---------- 기본 상태 (최초 1회) ---------- */
+function defaultState(){
+  return {
+    currency: { code:"JPY", symbol:"¥", name:"엔", decimals:0 },
+    homeCurrency: { code:"KRW", symbol:"₩", name:"원", decimals:0 },
+    people: [
+      { id:"p_me", name:"유쫑", isOwner:true  },
+      { id:"p_2",  name:"준보", isOwner:false }
+    ],
+    tags: [
+      { id:"t_1", name:"식비", color:"#d6452c" },
+      { id:"t_2", name:"교통", color:"#3c7a89" }
+    ],
+    charges: [],
+    expenses: []
+  };
+}
+
+/* ---------- 영속화 ---------- */
+let state;
+function load(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // 누락 키 보강 (스키마 안전장치)
+      const d = defaultState();
+      state = Object.assign(d, parsed);
+      state.currency = Object.assign(d.currency, parsed.currency||{});
+      state.homeCurrency = Object.assign(d.homeCurrency, parsed.homeCurrency||{});
+      // 마이그레이션: 기존 owner 기본 이름 "나" → "유쫑"
+      const owner = state.people.find(p=>p.isOwner);
+      if(owner && owner.name==="나") owner.name = "유쫑";
+      return;
+    }
+  }catch(e){ console.warn("load failed, resetting", e); }
+  state = defaultState();
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ---------- id 생성기 (Date 미사용 환경 대비 카운터) ---------- */
+let _idc = 0;
+function uid(prefix){
+  _idc++;
+  return prefix + "_" + Date.now().toString(36) + _idc.toString(36);
+}
+
+/* =========================================================================
+   계산 로직 (§4) — 명세 그대로
+   ========================================================================= */
+
+// 4-1. 가중평균환율 (원/엔). 충전 0건이면 null.
+function avgRate(){
+  const totForeign = sum(state.charges, c=>num(c.amountForeign));
+  if(totForeign <= 0) return null;
+  const totHome = sum(state.charges, c=>num(c.paidHome));
+  return totHome / totForeign;
+}
+
+// 4-2. 잔액
+function totals(){
+  const chargedForeign = sum(state.charges, c=>num(c.amountForeign));
+  const spentForeign   = sum(state.expenses, e=>num(e.amountForeign));
+  return {
+    chargedForeign,
+    spentForeign,
+    remainForeign: chargedForeign - spentForeign
+  };
+}
+
+// 4-4. 한화 환산: round(엔 × 평균환율). 환율 없으면 null.
+function toHome(foreign){
+  const r = avgRate();
+  if(r == null) return null;
+  return Math.round(foreign * r);
+}
+
+// 4-3. 정산: owner 제외 각 사람이 나에게 줄 돈
+function settlement(){
+  const owner = state.people.find(p=>p.isOwner);
+  const headcount = state.people.length || 1;
+  const sharedTotal = sum(
+    state.expenses.filter(e=>e.who===SHARED), e=>num(e.amountForeign)
+  );
+  const sharePer = sharedTotal / headcount;
+
+  return state.people
+    .filter(p => !p.isOwner)
+    .map(p=>{
+      const personal = sum(
+        state.expenses.filter(e=>e.who===p.id), e=>num(e.amountForeign)
+      );
+      const oweForeign = personal + sharePer;
+      return {
+        person:p,
+        personal,
+        share:sharePer,
+        oweForeign,
+        oweHome: toHome(oweForeign)
+      };
+    });
+}
+
+/* ---------- 작은 유틸 ---------- */
+function sum(arr, fn){ return arr.reduce((a,x)=>a+fn(x),0); }
+function num(v){ const n = Number(v); return isFinite(n)?n:0; }
+
+// 통화 표기 (하드코딩 금지: symbol/decimals를 설정에서 읽음)
+function fmtForeign(v){
+  const c = state.currency;
+  return c.symbol + fmtNum(v, c.decimals);
+}
+function fmtHome(v){
+  if(v == null) return "—";
+  const c = state.homeCurrency;
+  return c.symbol + fmtNum(v, c.decimals);
+}
+function fmtNum(v, decimals){
+  const n = Number(v)||0;
+  return n.toLocaleString("ko-KR", {
+    minimumFractionDigits: decimals, maximumFractionDigits: decimals
+  });
+}
+// 100단위 환율 표기 (예: 100엔 = N원)
+function rate100Label(){
+  const r = avgRate();
+  if(r==null) return "—";
+  const fc = state.currency, hc = state.homeCurrency;
+  return "100" + fc.name + " = " + hc.symbol + fmtNum(Math.round(r*100), 0);
+}
+
+/* =========================================================================
+   라우팅 / 렌더
+   ========================================================================= */
+let currentView = "home";
+const renderers = {};
+
+const VIEW_KEY = "eolmaji.view";
+function go(view){
+  currentView = view;
+  try{ localStorage.setItem(VIEW_KEY, view); }catch(e){}
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+view).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b=>{
+    b.classList.toggle("active", b.dataset.nav===view);
+  });
+  window.scrollTo(0,0);
+  render();
+}
+function render(){
+  if(renderers[currentView]) renderers[currentView]();
+}
+function el(id){ return document.getElementById("view-"+id); }
+
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=>go(b.dataset.nav));
+});
+
+/* ---- 헬퍼: HTML escape ---- */
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, m=>(
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]
+  ));
+}
+// 날짜 표시 (YYYY-MM-DD -> M월 D일 (요일))
+const WD = ["일","월","화","수","목","금","토"];
+function fmtDate(iso){
+  if(!iso) return "";
+  const parts = iso.split("-");
+  if(parts.length<3) return iso;
+  const d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+  if(isNaN(d)) return iso;
+  return `${+parts[1]}월 ${+parts[2]}일 (${WD[d.getDay()]})`;
+}
+function todayISO(){
+  const d = new Date();
+  const p = n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
+/* =========================================================================
+   3-1. 홈 (잔액)
+   ========================================================================= */
+renderers.home = function(){
+  const t = totals();
+  const remainHome = toHome(t.remainForeign);
+  const neg = t.remainForeign < 0;
+  const rate = avgRate();
+
+  el("home").innerHTML = `
+    <div class="card receipt balance-card">
+      <div class="balance-label">남은 ${esc(state.currency.name)}</div>
+      <div class="balance-main ${neg?'negative':''}">${fmtForeign(t.remainForeign)}</div>
+      <div class="balance-sub">${rate!=null ? fmtHome(remainHome) : "충전을 추가하면 한화가 표시돼요"}</div>
+      ${neg ? `<div class="balance-warn">⚠️ 가진 현금보다 ${fmtForeign(-t.remainForeign)} 더 썼어요</div>` : ""}
+      <div class="summary-row">
+        <div class="summary-item"><div class="v">${fmtForeign(t.chargedForeign)}</div><div class="k">총 충전</div></div>
+        <div class="summary-item"><div class="v">${fmtForeign(t.spentForeign)}</div><div class="k">총 지출</div></div>
+        <div class="summary-item"><div class="v">${esc(rate100Label())}</div><div class="k">평균 환율</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">빠른 환산기 · 이거 한화로 얼마지?</div>
+      <div class="converter">
+        <input id="conv-in" type="number" inputmode="numeric" placeholder="0" />
+        <span class="eq">≈</span>
+        <span class="out" id="conv-out">${rate!=null?fmtHome(0):"—"}</span>
+      </div>
+      ${rate==null?`<div class="rate-note" style="margin-top:12px;margin-bottom:0">충전(환전)을 먼저 추가하면 환율이 계산돼요.</div>`:""}
+    </div>
+
+    <button class="btn" id="home-add">＋ 지출 추가</button>
+  `;
+
+  document.getElementById("home-add").onclick = ()=>go("add");
+
+  const ci = document.getElementById("conv-in");
+  const co = document.getElementById("conv-out");
+  ci.addEventListener("input", ()=>{
+    const h = toHome(num(ci.value));
+    co.textContent = h==null ? "—" : fmtHome(h);
+  });
+};
+
+/* =========================================================================
+   3-2. 지출 추가
+   ========================================================================= */
+// 입력 폼 임시 상태
+let addForm = { tagId:null, who:null, date:null };
+
+renderers.add = function(){
+  if(addForm.date==null) addForm.date = todayISO();
+  // who 기본값: owner
+  if(addForm.who==null){
+    const owner = state.people.find(p=>p.isOwner);
+    addForm.who = owner ? owner.id : (state.people[0]&&state.people[0].id) || SHARED;
+  }
+
+  el("add").innerHTML = `
+    <div class="card">
+      <div class="field">
+        <label>상품명</label>
+        <input id="f-item" type="text" placeholder="예: 이치란 라멘" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label>금액 (${esc(state.currency.name)})</label>
+        <div class="amount-wrap">
+          <input id="f-amount" type="number" inputmode="numeric" placeholder="0" />
+          <span class="live" id="f-live">${fmtHome(0)}</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>분류</label>
+        <div class="chips" id="f-tags"></div>
+      </div>
+
+      <div class="field">
+        <label>누가</label>
+        <div class="chips" id="f-who"></div>
+      </div>
+
+      <div class="field">
+        <label>날짜</label>
+        <input id="f-date" type="date" value="${esc(addForm.date)}" />
+      </div>
+    </div>
+
+    <button class="btn" id="f-save">지출 기록하기</button>
+  `;
+
+  renderTagChips();
+  renderWhoChips();
+
+  // 한화 실시간 표시
+  const fa = document.getElementById("f-amount");
+  const live = document.getElementById("f-live");
+  const updLive = ()=>{
+    const h = toHome(num(fa.value));
+    live.textContent = h==null ? "환율 없음" : "≈ "+fmtHome(h);
+  };
+  fa.addEventListener("input", updLive);
+  updLive();
+
+  document.getElementById("f-date").addEventListener("change", e=>{
+    addForm.date = e.target.value || todayISO();
+  });
+
+  document.getElementById("f-save").onclick = saveExpense;
+};
+
+function renderTagChips(){
+  const wrap = document.getElementById("f-tags");
+  if(!wrap) return;
+  wrap.innerHTML = state.tags.map(t=>`
+    <button class="chip ${addForm.tagId===t.id?'selected':''}" data-tag="${esc(t.id)}">
+      <span class="dot" style="background:${esc(t.color)}"></span>${esc(t.name)}
+    </button>
+  `).join("") + `<button class="chip add" id="tag-new">＋ 새 태그</button>`;
+
+  wrap.querySelectorAll("[data-tag]").forEach(b=>{
+    b.onclick = ()=>{
+      addForm.tagId = (addForm.tagId===b.dataset.tag)? null : b.dataset.tag;
+      renderTagChips();
+    };
+  });
+  document.getElementById("tag-new").onclick = openNewTagModal;
+}
+
+function renderWhoChips(){
+  const wrap = document.getElementById("f-who");
+  if(!wrap) return;
+  // 노출 순서: owner → 다른 사람 → SHARED
+  const owner = state.people.filter(p=>p.isOwner);
+  const others = state.people.filter(p=>!p.isOwner);
+  const ordered = [...owner, ...others];
+  let html = ordered.map(p=>`
+    <button class="chip ${addForm.who===p.id?'selected':''}" data-who="${esc(p.id)}">
+      ${esc(p.name)}
+    </button>
+  `).join("");
+  html += `<button class="chip ${addForm.who===SHARED?'selected':''}" data-who="${SHARED}">공동</button>`;
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll("[data-who]").forEach(b=>{
+    b.onclick = ()=>{ addForm.who = b.dataset.who; renderWhoChips(); };
+  });
+}
+
+function openNewTagModal(){
+  const palette = ["#d6452c","#3c7a89","#e09f3e","#7b9e57","#9b5de5","#5c6b73","#c9184a","#2a9d8f"];
+  showModal(`
+    <h3>새 태그</h3>
+    <div class="field">
+      <label>태그 이름</label>
+      <input id="nt-name" type="text" placeholder="예: 쇼핑" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>색상</label>
+      <div class="chips" id="nt-colors">
+        ${palette.map((c,i)=>`<button class="chip" data-color="${c}" style="border-color:${c}">
+          <span class="dot" style="background:${c}"></span></button>`).join("")}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="nt-cancel">취소</button>
+      <button class="btn" id="nt-ok">추가</button>
+    </div>
+  `);
+  let picked = palette[0];
+  const cwrap = document.getElementById("nt-colors");
+  const paint = ()=> cwrap.querySelectorAll("[data-color]").forEach(b=>
+    b.classList.toggle("selected", b.dataset.color===picked));
+  cwrap.querySelectorAll("[data-color]").forEach(b=>{
+    b.onclick = ()=>{ picked=b.dataset.color; paint(); };
+  });
+  paint();
+  document.getElementById("nt-cancel").onclick = closeModal;
+  document.getElementById("nt-ok").onclick = ()=>{
+    const name = document.getElementById("nt-name").value.trim();
+    if(!name){ toast("이름을 입력해줘"); return; }
+    const tag = upsertTag(name, picked);
+    addForm.tagId = tag.id;
+    closeModal();
+    renderTagChips();
+  };
+  setTimeout(()=>document.getElementById("nt-name").focus(),50);
+}
+
+// 태그 생성 (중복 이름 방지 — 있으면 기존 것 사용)
+function upsertTag(name, color){
+  const exist = state.tags.find(t=>t.name===name);
+  if(exist) return exist;
+  const tag = { id:uid("t"), name, color: color||"#d6452c" };
+  state.tags.push(tag);
+  save();
+  return tag;
+}
+
+function saveExpense(){
+  const item = document.getElementById("f-item").value.trim();
+  const amount = Math.round(num(document.getElementById("f-amount").value));
+  if(!item){ toast("상품명을 입력해줘"); return; }
+  if(amount<=0){ toast("금액을 입력해줘"); return; }
+
+  if(editingExpenseId){
+    const e = state.expenses.find(x=>x.id===editingExpenseId);
+    if(e){
+      e.item=item; e.amountForeign=amount; e.tagId=addForm.tagId;
+      e.who=addForm.who; e.date=addForm.date;
+    }
+    editingExpenseId = null;
+  }else{
+    state.expenses.push({
+      id: uid("e"), date: addForm.date, item,
+      amountForeign: amount, tagId: addForm.tagId, who: addForm.who
+    });
+  }
+  save();
+  // 폼 리셋 (분류/누가/날짜는 직전 값 유지하면 연속 입력 편함 → 날짜만 유지)
+  addForm.tagId = null;
+  toast("기록했어요");
+  go("list");
+}
+
+/* =========================================================================
+   3-3. 지출 내역 (날짜별 그룹)
+   ========================================================================= */
+let editingExpenseId = null;
+let listFilter = "ALL"; // "ALL" | 사람 id | SHARED
+
+renderers.list = function(){
+  const box = el("list");
+  if(state.expenses.length===0){
+    box.innerHTML = emptyState("🧾","아직 지출이 없어요","지출 탭에서 첫 기록을 남겨보세요");
+    return;
+  }
+
+  // 필터 탭 목록: 전체 → 사람(owner 먼저) → 공동
+  const owner = state.people.filter(p=>p.isOwner);
+  const others = state.people.filter(p=>!p.isOwner);
+  const tabs = [
+    { key:"ALL", label:"전체" },
+    ...[...owner, ...others].map(p=>({ key:p.id, label:p.name })),
+    { key:SHARED, label:"공동" }
+  ];
+  // 현재 필터가 사라진 사람을 가리키면 전체로 복귀
+  if(!tabs.some(t=>t.key===listFilter)) listFilter = "ALL";
+
+  const matches = e => listFilter==="ALL" ? true : e.who===listFilter;
+  const filtered = state.expenses.filter(matches);
+  const total = sum(filtered, e=>num(e.amountForeign));
+  const curLabel = (tabs.find(t=>t.key===listFilter)||tabs[0]).label;
+
+  const tabsHtml = `<div class="filter-tabs">${tabs.map(t=>{
+    const cnt = state.expenses.filter(e=> t.key==="ALL"?true:e.who===t.key).length;
+    return `<button class="ftab ${listFilter===t.key?'active':''}" data-filter="${esc(t.key)}">
+        ${esc(t.label)}<span class="cnt">${cnt}</span></button>`;
+  }).join("")}</div>`;
+
+  const summaryHtml = `
+    <div class="card receipt list-total">
+      <div class="lt-label">${esc(curLabel)} 합계 · ${filtered.length}건</div>
+      <div class="lt-main">${fmtForeign(total)}</div>
+      <div class="lt-sub">${fmtHome(toHome(total))}</div>
+    </div>`;
+
+  let listHtml;
+  if(filtered.length===0){
+    listHtml = `<div class="empty" style="padding:30px"><div>이 항목에 해당하는 지출이 없어요</div></div>`;
+  }else{
+    const groups = {};
+    filtered.forEach(e=>{ (groups[e.date]=groups[e.date]||[]).push(e); });
+    const dates = Object.keys(groups).sort().reverse();
+    listHtml = dates.map(d=>{
+      const items = groups[d];
+      const dayTotal = sum(items, e=>num(e.amountForeign));
+      return `
+        <div class="day-group">
+          <div class="day-head">
+            <span>${esc(fmtDate(d))}</span>
+            <span class="total">${fmtForeign(dayTotal)} <span style="color:var(--muted);font-weight:400">· ${fmtHome(toHome(dayTotal))}</span></span>
+          </div>
+          <div class="card" style="padding:6px 14px;">
+            ${items.map(renderEntry).join("")}
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  box.innerHTML = tabsHtml + summaryHtml + listHtml;
+
+  box.querySelectorAll("[data-filter]").forEach(b=>{
+    b.onclick = ()=>{ listFilter = b.dataset.filter; renderers.list(); };
+  });
+  box.querySelectorAll("[data-edit]").forEach(b=>{
+    b.onclick = ()=>editExpense(b.dataset.edit);
+  });
+  box.querySelectorAll("[data-del]").forEach(b=>{
+    b.onclick = ()=>confirmDeleteExpense(b.dataset.del);
+  });
+};
+
+function renderEntry(e){
+  const tag = state.tags.find(t=>t.id===e.tagId);
+  const who = whoLabel(e.who);
+  const isShared = e.who===SHARED;
+  return `
+    <div class="entry">
+      <span class="tag-dot" style="background:${tag?esc(tag.color):'#ccc'}"></span>
+      <div class="info">
+        <div class="item">${esc(e.item)}</div>
+        <div class="meta">${tag?esc(tag.name):'분류 없음'} · ${esc(who)}</div>
+      </div>
+      <div class="amt">
+        <div class="f">${fmtForeign(e.amountForeign)}</div>
+        <div class="h">${fmtHome(toHome(e.amountForeign))}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;flex:none;">
+        <button class="icon-btn" data-edit="${esc(e.id)}">수정</button>
+        <button class="icon-btn danger" data-del="${esc(e.id)}">삭제</button>
+      </div>
+    </div>`;
+}
+
+function whoLabel(who){
+  if(who===SHARED) return "공동";
+  const p = state.people.find(x=>x.id===who);
+  return p ? p.name : "—";
+}
+
+function editExpense(id){
+  const e = state.expenses.find(x=>x.id===id);
+  if(!e) return;
+  editingExpenseId = id;
+  addForm.tagId = e.tagId;
+  addForm.who = e.who;
+  addForm.date = e.date;
+  go("add");
+  // 폼에 기존 값 채우기
+  document.getElementById("f-item").value = e.item;
+  document.getElementById("f-amount").value = e.amountForeign;
+  document.getElementById("f-amount").dispatchEvent(new Event("input"));
+  document.getElementById("f-save").textContent = "수정 저장";
+}
+
+function confirmDeleteExpense(id){
+  const e = state.expenses.find(x=>x.id===id);
+  if(!e) return;
+  showModal(`
+    <h3>지출 삭제</h3>
+    <p style="color:var(--muted);font-size:14px;margin:0 0 4px;">
+      <b>${esc(e.item)}</b> · ${fmtForeign(e.amountForeign)} 를 삭제할까요?
+    </p>
+    <div class="modal-actions">
+      <button class="btn secondary" id="d-cancel">취소</button>
+      <button class="btn" id="d-ok" style="background:var(--red)">삭제</button>
+    </div>
+  `);
+  document.getElementById("d-cancel").onclick = closeModal;
+  document.getElementById("d-ok").onclick = ()=>{
+    state.expenses = state.expenses.filter(x=>x.id!==id);
+    save(); closeModal(); render(); toast("삭제했어요");
+  };
+}
+
+/* =========================================================================
+   3-4. 충전 (환전)
+   ========================================================================= */
+let chargeMode = "amount"; // "amount" | "rate"
+let editingChargeId = null;
+
+renderers.charge = function(){
+  const box = el("charge");
+  const fc = state.currency, hc = state.homeCurrency;
+
+  const list = state.charges.length===0
+    ? emptyState("💴","아직 충전이 없어요","환전한 금액을 추가하면 환율이 계산돼요")
+    : `<div class="section-title">충전 내역</div>` +
+      [...state.charges].sort((a,b)=>(a.date<b.date?1:-1)).map(c=>{
+        const rate = num(c.paidHome)/(num(c.amountForeign)||1);
+        return `
+        <div class="card" style="padding:14px;">
+          <div class="setting-row" style="border:none;padding:0;">
+            <div class="grow">
+              <div class="name">${fmtForeign(c.amountForeign)} <span style="color:var(--muted);font-size:13px">충전</span></div>
+              <div class="sub">${esc(fmtDate(c.date))} · 낸 돈 ${fmtHome(c.paidHome)} · 100${esc(fc.name)}=${hc.symbol}${fmtNum(Math.round(rate*100),0)}</div>
+            </div>
+            <button class="icon-btn" data-cedit="${esc(c.id)}">수정</button>
+            <button class="icon-btn danger" data-cdel="${esc(c.id)}">삭제</button>
+          </div>
+        </div>`;
+      }).join("");
+
+  box.innerHTML = `
+    <button class="btn" id="ch-add" style="margin-bottom:16px;">＋ 충전(환전) 추가</button>
+    ${list}
+  `;
+  document.getElementById("ch-add").onclick = ()=>openChargeModal();
+  box.querySelectorAll("[data-cedit]").forEach(b=> b.onclick=()=>openChargeModal(b.dataset.cedit));
+  box.querySelectorAll("[data-cdel]").forEach(b=> b.onclick=()=>confirmDeleteCharge(b.dataset.cdel));
+};
+
+function openChargeModal(id){
+  editingChargeId = id || null;
+  chargeMode = "amount";
+  const c = id ? state.charges.find(x=>x.id===id) : null;
+  const fc = state.currency, hc = state.homeCurrency;
+
+  showModal(`
+    <h3>${c?'충전 수정':'충전(환전) 추가'}</h3>
+    <div class="field">
+      <label>날짜</label>
+      <input id="ch-date" type="date" value="${esc(c?c.date:todayISO())}" />
+    </div>
+    <div class="field">
+      <label>받은 ${esc(fc.name)} (${fc.symbol})</label>
+      <input id="ch-foreign" type="number" inputmode="numeric" placeholder="0" value="${c?c.amountForeign:''}" />
+    </div>
+
+    <div class="toggle" id="ch-toggle" style="margin:4px 0 14px;justify-content:flex-end;">
+      <span>환율 직접 입력</span>
+      <span class="switch" id="ch-switch"></span>
+    </div>
+
+    <div class="field" id="ch-paid-field">
+      <label>낸 ${esc(hc.name)} (${hc.symbol}) · 총액</label>
+      <input id="ch-paid" type="number" inputmode="numeric" placeholder="0" value="${c?c.paidHome:''}" />
+    </div>
+
+    <div class="field" id="ch-rate-field" style="display:none;">
+      <label>환율 (1${esc(fc.name)} 당 ${esc(hc.name)})</label>
+      <input id="ch-rate" type="number" inputmode="decimal" step="0.01" placeholder="예: 9.4" />
+    </div>
+
+    <div class="rate-note" id="ch-preview">이 건의 환율: —</div>
+
+    <div class="modal-actions">
+      <button class="btn secondary" id="ch-cancel">취소</button>
+      <button class="btn" id="ch-ok">저장</button>
+    </div>
+  `);
+
+  const dFor = document.getElementById("ch-foreign");
+  const dPaid = document.getElementById("ch-paid");
+  const dRate = document.getElementById("ch-rate");
+  const preview = document.getElementById("ch-preview");
+
+  function updPreview(){
+    const f = num(dFor.value);
+    let rate;
+    if(chargeMode==="rate"){
+      rate = num(dRate.value);
+    }else{
+      rate = f>0 ? num(dPaid.value)/f : 0;
+    }
+    if(f>0 && rate>0){
+      preview.textContent = `이 건의 환율: 100${fc.name} = ${hc.symbol}${fmtNum(Math.round(rate*100),0)}`;
+    }else{
+      preview.textContent = "이 건의 환율: —";
+    }
+  }
+  [dFor,dPaid,dRate].forEach(i=>i&&i.addEventListener("input",updPreview));
+  if(c){ updPreview(); }
+
+  // 토글
+  const sw = document.getElementById("ch-switch");
+  document.getElementById("ch-toggle").onclick = ()=>{
+    chargeMode = chargeMode==="amount" ? "rate" : "amount";
+    sw.classList.toggle("on", chargeMode==="rate");
+    document.getElementById("ch-paid-field").style.display = chargeMode==="amount"?"block":"none";
+    document.getElementById("ch-rate-field").style.display = chargeMode==="rate"?"block":"none";
+    updPreview();
+  };
+
+  document.getElementById("ch-cancel").onclick = closeModal;
+  document.getElementById("ch-ok").onclick = ()=>{
+    const date = document.getElementById("ch-date").value || todayISO();
+    const foreign = Math.round(num(dFor.value));
+    if(foreign<=0){ toast("받은 "+fc.name+"을 입력해줘"); return; }
+
+    let paidHome;
+    if(chargeMode==="rate"){
+      const rate = num(dRate.value);
+      if(rate<=0){ toast("환율을 입력해줘"); return; }
+      paidHome = Math.round(foreign * rate); // paidHome = amountForeign × 환율
+    }else{
+      paidHome = Math.round(num(dPaid.value));
+      if(paidHome<=0){ toast("낸 "+hc.name+"을 입력해줘"); return; }
+    }
+
+    if(editingChargeId){
+      const ex = state.charges.find(x=>x.id===editingChargeId);
+      if(ex){ ex.date=date; ex.amountForeign=foreign; ex.paidHome=paidHome; }
+    }else{
+      state.charges.push({ id:uid("c"), date, amountForeign:foreign, paidHome });
+    }
+    save(); closeModal(); render(); toast("충전을 저장했어요");
+  };
+}
+
+function confirmDeleteCharge(id){
+  const c = state.charges.find(x=>x.id===id);
+  if(!c) return;
+  showModal(`
+    <h3>충전 삭제</h3>
+    <p style="color:var(--muted);font-size:14px;margin:0 0 4px;">
+      ${esc(fmtDate(c.date))} · ${fmtForeign(c.amountForeign)} 충전을 삭제할까요?
+    </p>
+    <p class="danger-note">삭제하면 평균 환율이 다시 계산돼요.</p>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cd-cancel">취소</button>
+      <button class="btn" id="cd-ok" style="background:var(--red)">삭제</button>
+    </div>
+  `);
+  document.getElementById("cd-cancel").onclick = closeModal;
+  document.getElementById("cd-ok").onclick = ()=>{
+    state.charges = state.charges.filter(x=>x.id!==id);
+    save(); closeModal(); render(); toast("삭제했어요");
+  };
+}
+
+/* =========================================================================
+   3-5. 정산
+   ========================================================================= */
+renderers.settle = function(){
+  const box = el("settle");
+  const rate = avgRate();
+  const owner = state.people.find(p=>p.isOwner);
+  const results = settlement();
+
+  // 사람별 + 공동 합계 요약
+  const sharedTotal = sum(state.expenses.filter(e=>e.who===SHARED), e=>num(e.amountForeign));
+  const perPersonSpend = state.people.map(p=>({
+    p, total: sum(state.expenses.filter(e=>e.who===p.id), e=>num(e.amountForeign))
+  }));
+
+  if(state.expenses.length===0){
+    box.innerHTML = emptyState("🤝","정산할 지출이 없어요","지출을 기록하면 누가 얼마 줄지 계산돼요");
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="card receipt">
+      <div class="section-title" style="margin-top:0">지출 합계</div>
+      ${perPersonSpend.map(x=>`
+        <div class="setting-row">
+          <div class="grow"><span class="name">${esc(x.p.name)}</span></div>
+          <div style="text-align:right">
+            <div style="font-weight:700">${fmtForeign(x.total)}</div>
+            <div class="sub">${fmtHome(toHome(x.total))}</div>
+          </div>
+        </div>`).join("")}
+      <div class="setting-row">
+        <div class="grow"><span class="name" style="color:var(--teal)">공동</span></div>
+        <div style="text-align:right">
+          <div style="font-weight:700">${fmtForeign(sharedTotal)}</div>
+          <div class="sub">${fmtHome(toHome(sharedTotal))} · ${state.people.length}명 분담</div>
+        </div>
+      </div>
+    </div>
+    ${rate==null?`<div class="rate-note">충전(환전)을 추가하면 한화가 표시돼요.</div>`:""}
+  `;
+};
+
+/* =========================================================================
+   3-6. 설정
+   ========================================================================= */
+renderers.settings = function(){
+  const box = el("settings");
+  const fc = state.currency, hc = state.homeCurrency;
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="section-title" style="margin-top:0">사람 관리</div>
+      <div id="set-people"></div>
+      <button class="btn secondary small" id="add-person" style="margin-top:10px;">＋ 사람 추가</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0">태그 관리</div>
+      <div id="set-tags"></div>
+      <button class="btn secondary small" id="add-tag" style="margin-top:10px;">＋ 태그 추가</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0">통화 설정</div>
+      <div class="setting-row">
+        <div class="grow"><div class="name">지출 통화</div><div class="sub">현재 ${esc(fc.code)} · ${esc(fc.symbol)} (${esc(fc.name)})</div></div>
+        <button class="icon-btn" id="edit-cur">변경</button>
+      </div>
+      <div class="setting-row">
+        <div class="grow"><div class="name">기준(한화) 통화</div><div class="sub">현재 ${esc(hc.code)} · ${esc(hc.symbol)} (${esc(hc.name)})</div></div>
+        <button class="icon-btn" id="edit-home">변경</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-top:0">데이터</div>
+      <div class="setting-row">
+        <div class="grow"><div class="name">전체 초기화</div><div class="sub">모든 충전·지출·태그·사람 삭제</div></div>
+        <button class="icon-btn danger" id="reset-all">초기화</button>
+      </div>
+    </div>
+  `;
+
+  renderSettingsPeople();
+  renderSettingsTags();
+
+  document.getElementById("add-person").onclick = ()=>openPersonModal();
+  document.getElementById("add-tag").onclick = ()=>openTagModalSettings();
+  document.getElementById("edit-cur").onclick = ()=>openCurrencyModal("currency");
+  document.getElementById("edit-home").onclick = ()=>openCurrencyModal("homeCurrency");
+  document.getElementById("reset-all").onclick = confirmReset;
+};
+
+function renderSettingsPeople(){
+  const wrap = document.getElementById("set-people");
+  if(!wrap) return;
+  wrap.innerHTML = state.people.map(p=>`
+    <div class="setting-row">
+      <div class="grow"><span class="name">${esc(p.name)}</span> ${p.isOwner?'<span class="owner-badge">나(owner)</span>':''}</div>
+      ${!p.isOwner?`<button class="icon-btn" data-owner="${esc(p.id)}">owner 지정</button>`:''}
+      <button class="icon-btn" data-pedit="${esc(p.id)}">이름</button>
+      <button class="icon-btn danger" data-pdel="${esc(p.id)}">삭제</button>
+    </div>`).join("");
+
+  wrap.querySelectorAll("[data-owner]").forEach(b=> b.onclick=()=>setOwner(b.dataset.owner));
+  wrap.querySelectorAll("[data-pedit]").forEach(b=> b.onclick=()=>openPersonModal(b.dataset.pedit));
+  wrap.querySelectorAll("[data-pdel]").forEach(b=> b.onclick=()=>confirmDeletePerson(b.dataset.pdel));
+}
+
+function renderSettingsTags(){
+  const wrap = document.getElementById("set-tags");
+  if(!wrap) return;
+  if(state.tags.length===0){ wrap.innerHTML = `<div class="sub" style="padding:8px 4px;color:var(--muted)">태그가 없어요</div>`; return; }
+  wrap.innerHTML = state.tags.map(t=>{
+    const usage = state.expenses.filter(e=>e.tagId===t.id).length;
+    return `
+    <div class="setting-row">
+      <span class="tag-dot" style="background:${esc(t.color)};width:12px;height:12px;border-radius:50%;flex:none;"></span>
+      <div class="grow"><span class="name">${esc(t.name)}</span><span class="sub"> · ${usage}건</span></div>
+      <button class="icon-btn" data-tedit="${esc(t.id)}">이름</button>
+      <button class="icon-btn danger" data-tdel="${esc(t.id)}">삭제</button>
+    </div>`;
+  }).join("");
+  wrap.querySelectorAll("[data-tedit]").forEach(b=> b.onclick=()=>openTagRenameModal(b.dataset.tedit));
+  wrap.querySelectorAll("[data-tdel]").forEach(b=> b.onclick=()=>confirmDeleteTag(b.dataset.tdel));
+}
+
+/* --- 사람 모달 --- */
+function openPersonModal(id){
+  const p = id ? state.people.find(x=>x.id===id) : null;
+  showModal(`
+    <h3>${p?'이름 변경':'사람 추가'}</h3>
+    <div class="field">
+      <label>이름</label>
+      <input id="pm-name" type="text" value="${p?esc(p.name):''}" placeholder="예: 준보" autocomplete="off"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="pm-cancel">취소</button>
+      <button class="btn" id="pm-ok">저장</button>
+    </div>
+  `);
+  document.getElementById("pm-cancel").onclick = closeModal;
+  document.getElementById("pm-ok").onclick = ()=>{
+    const name = document.getElementById("pm-name").value.trim();
+    if(!name){ toast("이름을 입력해줘"); return; }
+    if(p){ p.name = name; }
+    else { state.people.push({ id:uid("p"), name, isOwner:false }); }
+    save(); closeModal(); renderSettingsPeople();
+  };
+  setTimeout(()=>document.getElementById("pm-name").focus(),50);
+}
+
+function setOwner(id){
+  state.people.forEach(p=> p.isOwner = (p.id===id));
+  save(); renderSettingsPeople(); toast("owner를 변경했어요");
+}
+
+function confirmDeletePerson(id){
+  const p = state.people.find(x=>x.id===id);
+  if(!p) return;
+  if(p.isOwner){ toast("owner는 삭제할 수 없어요. 먼저 owner를 바꿔주세요"); return; }
+  const linked = state.expenses.filter(e=>e.who===id);
+  const others = state.people.filter(x=>x.id!==id);
+
+  // 그 사람에게 달린 지출 처리: 차단 or 재할당 (확인 모달)
+  let body = `<p style="color:var(--muted);font-size:14px;margin:0 0 10px;"><b>${esc(p.name)}</b>를 삭제할까요?</p>`;
+  if(linked.length>0){
+    body += `<p class="danger-note" style="margin-bottom:10px;">이 사람에게 달린 지출이 ${linked.length}건 있어요. 어떻게 처리할까요?</p>`;
+  }
+  showModal(`
+    <h3>사람 삭제</h3>
+    ${body}
+    <div class="modal-actions" style="flex-direction:column;gap:8px;">
+      ${linked.length>0 ? `
+        <button class="btn secondary" id="pd-shared">지출을 '공동'으로 재할당</button>
+        ${others.filter(o=>!o.isOwner||true).length? `<button class="btn secondary" id="pd-reassign">지출을 다른 사람에게</button>`:''}
+        <button class="btn secondary" id="pd-delall" style="color:var(--red)">지출도 함께 삭제</button>
+      ` : `<button class="btn" id="pd-ok" style="background:var(--red)">삭제</button>`}
+      <button class="btn ghost" id="pd-cancel">취소</button>
+    </div>
+  `);
+  document.getElementById("pd-cancel").onclick = closeModal;
+
+  const doDelete = ()=>{ state.people = state.people.filter(x=>x.id!==id); save(); closeModal(); renderSettingsPeople(); render(); toast("삭제했어요"); };
+
+  if(linked.length===0){
+    document.getElementById("pd-ok").onclick = doDelete;
+  }else{
+    document.getElementById("pd-shared").onclick = ()=>{
+      state.expenses.forEach(e=>{ if(e.who===id) e.who=SHARED; }); doDelete();
+    };
+    document.getElementById("pd-delall").onclick = ()=>{
+      state.expenses = state.expenses.filter(e=>e.who!==id); doDelete();
+    };
+    const reassign = document.getElementById("pd-reassign");
+    if(reassign){
+      reassign.onclick = ()=>openReassignModal(id, others);
+    }
+  }
+}
+
+function openReassignModal(fromId, others){
+  showModal(`
+    <h3>지출 재할당</h3>
+    <p style="color:var(--muted);font-size:14px;margin:0 0 12px;">지출을 누구에게 옮길까요?</p>
+    <div class="chips" id="ra-list">
+      ${others.map(o=>`<button class="chip" data-to="${esc(o.id)}">${esc(o.name)}</button>`).join("")}
+      <button class="chip" data-to="${SHARED}">공동</button>
+    </div>
+    <div class="modal-actions"><button class="btn secondary" id="ra-cancel">취소</button></div>
+  `);
+  document.getElementById("ra-cancel").onclick = closeModal;
+  document.querySelectorAll("#ra-list [data-to]").forEach(b=>{
+    b.onclick = ()=>{
+      const to = b.dataset.to;
+      state.expenses.forEach(e=>{ if(e.who===fromId) e.who=to; });
+      state.people = state.people.filter(x=>x.id!==fromId);
+      save(); closeModal(); renderSettingsPeople(); render(); toast("재할당 후 삭제했어요");
+    };
+  });
+}
+
+/* --- 태그 모달 (설정) --- */
+function openTagModalSettings(){
+  openNewTagModalGeneric((tag)=>{ renderSettingsTags(); });
+}
+function openNewTagModalGeneric(onDone){
+  const palette = ["#d6452c","#3c7a89","#e09f3e","#7b9e57","#9b5de5","#5c6b73","#c9184a","#2a9d8f"];
+  showModal(`
+    <h3>새 태그</h3>
+    <div class="field"><label>이름</label><input id="nt-name" type="text" placeholder="예: 쇼핑" autocomplete="off"/></div>
+    <div class="field"><label>색상</label>
+      <div class="chips" id="nt-colors">
+        ${palette.map(c=>`<button class="chip" data-color="${c}" style="border-color:${c}"><span class="dot" style="background:${c}"></span></button>`).join("")}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="nt-cancel">취소</button>
+      <button class="btn" id="nt-ok">추가</button>
+    </div>
+  `);
+  let picked = palette[0];
+  const cwrap = document.getElementById("nt-colors");
+  const paint = ()=> cwrap.querySelectorAll("[data-color]").forEach(b=> b.classList.toggle("selected", b.dataset.color===picked));
+  cwrap.querySelectorAll("[data-color]").forEach(b=> b.onclick=()=>{ picked=b.dataset.color; paint(); });
+  paint();
+  document.getElementById("nt-cancel").onclick = closeModal;
+  document.getElementById("nt-ok").onclick = ()=>{
+    const name = document.getElementById("nt-name").value.trim();
+    if(!name){ toast("이름을 입력해줘"); return; }
+    const tag = upsertTag(name, picked);
+    closeModal(); onDone&&onDone(tag);
+  };
+  setTimeout(()=>document.getElementById("nt-name").focus(),50);
+}
+
+function openTagRenameModal(id){
+  const t = state.tags.find(x=>x.id===id);
+  if(!t) return;
+  showModal(`
+    <h3>태그 이름 변경</h3>
+    <div class="field"><label>이름</label><input id="tr-name" type="text" value="${esc(t.name)}" autocomplete="off"/></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="tr-cancel">취소</button>
+      <button class="btn" id="tr-ok">저장</button>
+    </div>
+  `);
+  document.getElementById("tr-cancel").onclick = closeModal;
+  document.getElementById("tr-ok").onclick = ()=>{
+    const name = document.getElementById("tr-name").value.trim();
+    if(!name){ toast("이름을 입력해줘"); return; }
+    const dup = state.tags.find(x=>x.name===name && x.id!==id);
+    if(dup){ toast("같은 이름의 태그가 있어요"); return; }
+    t.name = name; save(); closeModal(); renderSettingsTags();
+  };
+}
+
+function confirmDeleteTag(id){
+  const t = state.tags.find(x=>x.id===id);
+  if(!t) return;
+  const usage = state.expenses.filter(e=>e.tagId===id).length;
+  showModal(`
+    <h3>태그 삭제</h3>
+    <p style="color:var(--muted);font-size:14px;margin:0 0 4px;"><b>${esc(t.name)}</b> 태그를 삭제할까요?</p>
+    ${usage>0?`<p class="danger-note">이 태그를 쓰던 지출 ${usage}건은 '분류 없음'으로 남아요.</p>`:''}
+    <div class="modal-actions">
+      <button class="btn secondary" id="td-cancel">취소</button>
+      <button class="btn" id="td-ok" style="background:var(--red)">삭제</button>
+    </div>
+  `);
+  document.getElementById("td-cancel").onclick = closeModal;
+  document.getElementById("td-ok").onclick = ()=>{
+    // 태그 삭제: 지출은 분류 없음(null)으로
+    state.expenses.forEach(e=>{ if(e.tagId===id) e.tagId=null; });
+    state.tags = state.tags.filter(x=>x.id!==id);
+    save(); closeModal(); renderSettingsTags(); toast("삭제했어요");
+  };
+}
+
+/* --- 통화 모달 --- */
+function openCurrencyModal(which){
+  const c = state[which];
+  const title = which==="currency" ? "지출 통화" : "기준(한화) 통화";
+  showModal(`
+    <h3>${title} 설정</h3>
+    <div class="field"><label>코드 (예: JPY)</label><input id="cm-code" type="text" value="${esc(c.code)}" autocomplete="off"/></div>
+    <div class="field"><label>기호 (예: ¥)</label><input id="cm-symbol" type="text" value="${esc(c.symbol)}" autocomplete="off"/></div>
+    <div class="field"><label>이름 (예: 엔)</label><input id="cm-name" type="text" value="${esc(c.name)}" autocomplete="off"/></div>
+    <div class="field"><label>소수점 자리수</label><input id="cm-dec" type="number" inputmode="numeric" value="${c.decimals}"/></div>
+    <div class="modal-actions">
+      <button class="btn secondary" id="cm-cancel">취소</button>
+      <button class="btn" id="cm-ok">저장</button>
+    </div>
+  `);
+  document.getElementById("cm-cancel").onclick = closeModal;
+  document.getElementById("cm-ok").onclick = ()=>{
+    const code = document.getElementById("cm-code").value.trim();
+    const symbol = document.getElementById("cm-symbol").value.trim();
+    const name = document.getElementById("cm-name").value.trim();
+    const decimals = Math.max(0, Math.round(num(document.getElementById("cm-dec").value)));
+    if(!code||!symbol||!name){ toast("모든 칸을 채워줘"); return; }
+    state[which] = { code, symbol, name, decimals };
+    save(); closeModal(); render(); toast("통화를 변경했어요");
+  };
+}
+
+function confirmReset(){
+  showModal(`
+    <h3>전체 초기화</h3>
+    <p class="danger-note" style="margin:0 0 4px;">모든 데이터(충전·지출·태그·사람)가 삭제돼요. 되돌릴 수 없어요.</p>
+    <div class="modal-actions">
+      <button class="btn secondary" id="rs-cancel">취소</button>
+      <button class="btn" id="rs-ok" style="background:var(--red)">초기화</button>
+    </div>
+  `);
+  document.getElementById("rs-cancel").onclick = closeModal;
+  document.getElementById("rs-ok").onclick = ()=>{
+    state = defaultState(); save(); closeModal(); go("home"); toast("초기화했어요");
+  };
+}
+
+/* =========================================================================
+   공통 UI: 모달 / 토스트 / 빈 상태
+   ========================================================================= */
+const overlay = document.getElementById("overlay");
+function showModal(html){
+  overlay.innerHTML = `<div class="modal">${html}</div>`;
+  overlay.classList.add("show");
+}
+function closeModal(){
+  overlay.classList.remove("show");
+  overlay.innerHTML = "";
+}
+overlay.addEventListener("click", e=>{ if(e.target===overlay) closeModal(); });
+
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 1600);
+}
+
+function emptyState(big, title, sub){
+  return `<div class="empty"><div class="big">${big}</div><div style="font-size:16px;color:var(--ink);margin-bottom:4px;">${esc(title)}</div><div>${esc(sub)}</div></div>`;
+}
+
+/* =========================================================================
+   부팅
+   ========================================================================= */
+load();
+// 마지막으로 보던 화면 복원 (없으면 홈)
+const validViews = ["home","add","list","charge","settle","settings"];
+let startView = "home";
+try{
+  const saved = localStorage.getItem(VIEW_KEY);
+  if(saved && validViews.includes(saved)) startView = saved;
+}catch(e){}
+go(startView);
+
+// 서비스워커 등록 (오프라인 작동). https 또는 localhost에서만 동작.
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(err=>console.warn("SW 등록 실패", err));
+  });
+}
+</script>
+</body>
+</html>
