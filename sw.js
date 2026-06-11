@@ -1,6 +1,6 @@
 /* 얼마지 서비스워커 — 오프라인 작동 + 온라인이면 자동 최신화.
    앱 파일을 바꾸면 아래 CACHE 버전을 올려라(예: v2 → v3). */
-const CACHE = "eolmaji-v3";
+const CACHE = "eolmaji-v4";
 
 // 앱을 이루는 핵심 파일 (상대 경로 — GitHub Pages 하위 경로에서도 동작)
 const ASSETS = [
