@@ -118,9 +118,13 @@
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
   .field input[type=text],.field input[type=number],.field input[type=date],.field select{
-    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+    width:100%;max-width:100%;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
     background:#fff;color:var(--ink);outline:none;
+    -webkit-appearance:none;appearance:none;   /* iOS date 입력이 기본 폭으로 삐져나가는 것 방지 */
   }
+  /* iOS date 입력 내부 요소 정렬·여백 정리 */
+  .field input[type=date]{height:48px;line-height:24px;text-align:left;}
+  .field input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0;}
   .field input:focus,.field select:focus{border-color:var(--red);}
   .amount-wrap{position:relative;display:flex;align-items:center;gap:10px;}
   .amount-wrap input{flex:1;text-align:right;font-size:20px;font-weight:700;}
